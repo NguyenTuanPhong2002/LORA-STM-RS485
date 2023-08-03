@@ -9,14 +9,17 @@
 #define EWG_EWG_H_
 
 #include "main.h"
+#include "stm32l052xx.h"
 
-#define EWG_RE_GPIO GPIOB, RE_Pin
-#define EWG_DE_GPIO GPIOB, DE_Pin
+#define EWG_RE_GPIO RE_GPIO_Port, RE_Pin
+#define EWG_DE_GPIO DE_GPIO_Port, DE_Pin
+
+#define EWG_POWER_GPIO PWR_SENSO_GPIO_Port, PWR_SENSO_Pin
 
 /* Array offset for water level sensor */
-#define EWG_SECTION_ARR_OFFSET	(1u)
+#define EWG_SECTION_ARR_OFFSET (1u)
 /* Number of sections of water level sensor */
-#define EWG_MAX_SECTION			(12u + EWG_SECTION_ARR_OFFSET)
+#define EWG_MAX_SECTION (12u + EWG_SECTION_ARR_OFFSET)
 
 typedef struct
 {
@@ -24,4 +27,13 @@ typedef struct
     uint8_t sectionLevel[EWG_MAX_SECTION];
 } EWG_HandleTypedef;
 
+typedef enum
+{
+    EWG_BUSY,
+    EWG_OK,
+    EWG_ERROR,
+    EWG_TIMEOUT
+} EWG_StatusTypedef;
+
+EWG_StatusTypedef EWG_init(EWG_HandleTypedef *const me);
 #endif /* EWG_EWG_H_ */
