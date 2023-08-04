@@ -8,8 +8,7 @@
 #ifndef EWG_EWG_H_
 #define EWG_EWG_H_
 
-#include "main.h"
-#include "stm32l052xx.h"
+#include "../../PROCESSING/SENSO/senso.h"
 
 #define EWG_RE_GPIO RE_GPIO_Port, RE_Pin
 #define EWG_DE_GPIO DE_GPIO_Port, DE_Pin
@@ -25,15 +24,8 @@ typedef struct
 {
     uint8_t section;
     uint8_t sectionLevel[EWG_MAX_SECTION];
+    LEVEL_HandleTypedef leverHandle; 
 } EWG_HandleTypedef;
-
-typedef enum
-{
-    EWG_BUSY,
-    EWG_OK,
-    EWG_ERROR,
-    EWG_TIMEOUT
-} EWG_StatusTypedef;
 
 EWG_StatusTypedef EWG_init(EWG_HandleTypedef *const me);
 #endif /* EWG_EWG_H_ */
