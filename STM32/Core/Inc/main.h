@@ -59,6 +59,7 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define DIO0_Pin GPIO_PIN_0
 #define DIO0_GPIO_Port GPIOA
+#define DIO0_EXTI_IRQn EXTI0_1_IRQn
 #define VT_Pin GPIO_PIN_1
 #define VT_GPIO_Port GPIOA
 #define Tx_Pin GPIO_PIN_2
@@ -69,6 +70,7 @@ void Error_Handler(void);
 #define RESET_GPIO_Port GPIOB
 #define DIO1_Pin GPIO_PIN_1
 #define DIO1_GPIO_Port GPIOB
+#define DIO1_EXTI_IRQn EXTI0_1_IRQn
 #define TX1_Pin GPIO_PIN_9
 #define TX1_GPIO_Port GPIOA
 #define RX1_Pin GPIO_PIN_10
