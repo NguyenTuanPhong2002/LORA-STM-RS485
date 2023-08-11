@@ -1,0 +1,9 @@
+ewg.c:61:10:EWG_calcCRC16Modbus	4
+ewg.c:87:26:sendCommand.constprop	7
+ewg.c:142:19:EWG_init	5
+ewg.c:179:19:EWG_deInit	2
+ewg.c:194:19:EWG_process	2
+ewg.c:208:7:EWG_getLevel	5
+ewg.c:244:19:EWG_setSection	3
+ewg.c:263:19:EWG_getConfig	4
+ewg.c:278:19:EWG_writeEEPROMs	1

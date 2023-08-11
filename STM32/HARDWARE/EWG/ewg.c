@@ -12,8 +12,8 @@ static inline void EWG_enableTransmitMode(EWG_HandleTypedef *const me)
         return;
     }
 
-    HAL_GPIO_WritePin(EWG_DE_GPIO, SET);
-    HAL_GPIO_WritePin(EWG_DE_GPIO, SET);
+    HAL_GPIO_WritePin(EWG_DE_GPIO, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(EWG_RE_GPIO, GPIO_PIN_SET);
 }
 
 static inline void EWG_enableReciveMode(EWG_HandleTypedef *const me)
@@ -23,8 +23,8 @@ static inline void EWG_enableReciveMode(EWG_HandleTypedef *const me)
         return;
     }
 
-    HAL_GPIO_WritePin(EWG_DE_GPIO, RESET);
-    HAL_GPIO_WritePin(EWG_DE_GPIO, RESET);
+    HAL_GPIO_WritePin(EWG_DE_GPIO, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(EWG_RE_GPIO, GPIO_PIN_RESET);
 }
 
 static inline void EWG_shutdownMode(EWG_HandleTypedef *const me)
@@ -34,8 +34,8 @@ static inline void EWG_shutdownMode(EWG_HandleTypedef *const me)
         return;
     }
 
-    HAL_GPIO_WritePin(EWG_DE_GPIO, SET);
-    HAL_GPIO_WritePin(EWG_DE_GPIO, RESET);
+    HAL_GPIO_WritePin(EWG_RE_GPIO, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(EWG_DE_GPIO, GPIO_PIN_SET);
 }
 
 static inline void EWG_powerEnable(EWG_HandleTypedef *const me)
@@ -46,6 +46,7 @@ static inline void EWG_powerEnable(EWG_HandleTypedef *const me)
     }
 
     HAL_GPIO_WritePin(EWG_POWER_GPIO, SET);
+    HAL_Delay(3000);
 }
 
 static inline void EWG_powerDisable(EWG_HandleTypedef *const me)
@@ -84,7 +85,7 @@ uint16_t EWG_calcCRC16Modbus(const uint8_t *buf, uint8_t len)
     return crc;
 }
 
-static CTL_StatusTypedef sendCommand(EWG_HandleTypedef *const me, uint8_t *Command, uint8_t size, uint16_t timeout)
+static CTL_StatusTypedef sendCommand(EWG_HandleTypedef *const me, uint8_t *Command, uint8_t size, uint32_t timeout)
 {
     if (me == NULL || Command == NULL)
     {
@@ -97,7 +98,7 @@ static CTL_StatusTypedef sendCommand(EWG_HandleTypedef *const me, uint8_t *Comma
 
     CTL_StatusTypedef status = CTL_BUSY;
 
-    memset(me->leverHandle.buffer, "\0", LEVEL_BUFFER_SIZE);
+    memset(me->leverHandle.buffer, '\0', LEVEL_BUFFER_SIZE);
 
     HAL_UART_Transmit(&huart2, Command, size, timeout);
 
@@ -109,7 +110,7 @@ static CTL_StatusTypedef sendCommand(EWG_HandleTypedef *const me, uint8_t *Comma
     {
         if (HAL_GetTick() - tickStart >= timeout)
         {
-            status = CTL_BUSY;
+            status = CTL_TIMEOUT;
             SENSO_SET_FLAG(&me->leverHandle, SENSO_FLAG_SCF);
         }
         else
@@ -151,6 +152,8 @@ CTL_StatusTypedef EWG_init(EWG_HandleTypedef *const me)
         return CTL_ERROR;
     }
 
+    HAL_GPIO_WritePin(EWG_POWER_GPIO, GPIO_PIN_SET);
+
     EWG_powerEnable(me);
 
     HAL_UARTEx_ReceiveToIdle_IT(&huart2, (uint8_t *)me->leverHandle.buffer, LEVEL_BUFFER_SIZE);
@@ -162,7 +165,7 @@ CTL_StatusTypedef EWG_init(EWG_HandleTypedef *const me)
 
     CTL_StatusTypedef status = CTL_ERROR;
 
-    while (HAL_GetTick() - tickStart <= 3000)
+    while (HAL_GetTick() - tickStart <= 3000u)
     {
         if (sendCommand(me, command, sizeof(command), 1000) == CTL_OK)
         {
@@ -209,14 +212,14 @@ float EWG_getLevel(EWG_HandleTypedef *const me)
 {
     float lever = 0.0;
 
-    uint8_t queryFrame[8] = {0x0, 0x3, 0x0, 0x0, 0x0, 0x7, 0x0, 0x0};
+    uint8_t queryFrame[8] = {0x00, 0x03, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00};
 
     EWG_powerEnable(me);
 
     for (size_t i = 1; i <= me->section; i++)
     {
         queryFrame[0] = i;
-        uint16_t reponseCRC = EWG_calcCRC16Modbus(queryFrame, sizeof(queryFrame) - 2);
+        uint16_t reponseCRC = EWG_calcCRC16Modbus(queryFrame, sizeof(queryFrame) - 2u);
         queryFrame[6] = (uint8_t)(reponseCRC & 0xFF);
         queryFrame[7] = (uint8_t)((reponseCRC >> 8) & 0xFF);
 
@@ -283,7 +286,7 @@ CTL_StatusTypedef EWG_writeEEPROMs(EWG_HandleTypedef *const me)
     }
 
     /* Read section from EEPROM */
-    uint8_t sectionStoredInDataEEPROM = *(volatile uint8_t *)EWG_EEPROM_SECTION;
+    // uint8_t sectionStoredInDataEEPROM = *(volatile uint8_t *)EWG_EEPROM_SECTION;
 
     // if (me->section != sectionStoredInDataEEPROM)
     // {

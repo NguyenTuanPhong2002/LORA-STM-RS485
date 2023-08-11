@@ -66,6 +66,8 @@ void Error_Handler(void);
 #define Tx_GPIO_Port GPIOA
 #define Rx_Pin GPIO_PIN_3
 #define Rx_GPIO_Port GPIOA
+#define NSS_Pin GPIO_PIN_4
+#define NSS_GPIO_Port GPIOA
 #define RESET_Pin GPIO_PIN_0
 #define RESET_GPIO_Port GPIOB
 #define DIO1_Pin GPIO_PIN_1
