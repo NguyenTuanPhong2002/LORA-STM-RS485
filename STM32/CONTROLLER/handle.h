@@ -10,6 +10,8 @@
 
 #include "main.h"
 
+
+
 typedef enum
 {
     CTL_BUSY,
@@ -17,5 +19,7 @@ typedef enum
     CTL_ERROR,
     CTL_TIMEOUT
 } CTL_StatusTypedef;
+
+void print(const char *buffer);
 
 #endif /* INC_CONTROLLER_H_ */

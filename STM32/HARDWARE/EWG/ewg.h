@@ -34,7 +34,7 @@ typedef struct {
 CTL_StatusTypedef EWG_init(EWG_HandleTypedef *const me);
 CTL_StatusTypedef EWG_deInit(EWG_HandleTypedef *const me);
 CTL_StatusTypedef EWG_process(EWG_HandleTypedef *const me, uint16_t size);
-float EWG_getLevel(EWG_HandleTypedef *const me);
+uint8_t EWG_getLevel(EWG_HandleTypedef *const me);
 CTL_StatusTypedef EWG_setSection(EWG_HandleTypedef *const me, uint8_t section);
 CTL_StatusTypedef EWG_getConfig(EWG_HandleTypedef *const me,
 		uint32_t configType, char pData[], uint16_t size);

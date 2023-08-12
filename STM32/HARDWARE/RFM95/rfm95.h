@@ -8,13 +8,13 @@
 #ifndef RFM95_RFM95_H_
 #define RFM95_RFM95_H_
 
-#include "main.h"
+#include <stdint.h>
 #include "stm32l0xx_hal.h"
 
 #include "../../PROCESSING/LORA/lora.h"
 
 
-#define NSS_GPIO GPIOA, GPIO_PIN_3
+#define NSS_GPIO GPIOA, GPIO_PIN_4
 
 
 

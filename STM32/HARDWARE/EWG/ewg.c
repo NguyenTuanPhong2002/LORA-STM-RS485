@@ -208,9 +208,9 @@ CTL_StatusTypedef EWG_process(EWG_HandleTypedef *const me, uint16_t size)
     return CTL_OK;
 }
 
-float EWG_getLevel(EWG_HandleTypedef *const me)
+uint8_t EWG_getLevel(EWG_HandleTypedef *const me)
 {
-    float lever = 0.0;
+    uint8_t lever = 0u;
 
     uint8_t queryFrame[8] = {0x00, 0x03, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00};
 
@@ -233,12 +233,12 @@ float EWG_getLevel(EWG_HandleTypedef *const me)
 
     if (lever >= (me->section * LENGTH_OF_ONE_SECTION))
     {
-        lever = 0.0f;
+        lever = 0u;
     }
     else
     {
         /* Convert cm to mm */
-        lever *= 10.0f;
+        lever *= 10u;
     }
 
     return lever;

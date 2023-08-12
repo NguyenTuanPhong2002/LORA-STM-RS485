@@ -990,8 +990,8 @@ CTL_StatusTypedef RFM95_init(RFM95_HandleTypeDef *const me)
 		return CTL_ERROR;
 	}
 
-	RFM95_powerOn(me);
-	HAL_Delay(100);
+	//RFM95_powerOn(me);
+	//HAL_Delay(100);
 	RFM95_reset(me);
 	RFM95_setMode(me, RFLR_OPMODE_LONGRANGEMODE_ON | RFLR_OPMODE_SLEEP | RFLR_OPMODE_FREQMODE_ACCESS_HF);
 	RFM95_setFrequency(me, 923);
