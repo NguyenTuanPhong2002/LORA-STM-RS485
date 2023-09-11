@@ -8,23 +8,23 @@
  * @param degree [in]  Angle in degree.
  * @retval Cosine of degree
  */
-static double SENSOR_cosine(int16_t degree)
-{
-    double sum = 1.0;
-    double term = 1.0;
-    double sign = -1.0;
-    /* Conver degree to radian */
-    double rad = degree * 3.14159265 / 180;
+// static double SENSOR_cosine(int16_t degree)
+// {
+//     double sum = 1.0;
+//     double term = 1.0;
+//     double sign = -1.0;
+//     /* Conver degree to radian */
+//     double rad = degree * 3.14159265 / 180;
 
-    for (uint32_t i = 2u; i <= 20u; i += 2u)
-    {
-        term *= (rad * rad) / ((double)i * ((double)i - 1.0));
-        sum += sign * term;
-        sign *= -1.0;
-    }
+//     for (uint32_t i = 2u; i <= 20u; i += 2u)
+//     {
+//         term *= (rad * rad) / ((double)i * ((double)i - 1.0));
+//         sum += sign * term;
+//         sign *= -1.0;
+//     }
 
-    return sum;
-}
+//     return sum;
+// }
 
 CTL_StatusTypedef SENSOR_init(LEVEL_HandleTypedef *const me)
 {
@@ -74,14 +74,14 @@ CTL_StatusTypedef SENSOR_setSection(LEVEL_HandleTypedef *const me, uint8_t secti
     return (*me->levsenSetSection)(me, section);
 }
 
-float SENSOR_getNewValue(LEVEL_HandleTypedef *const me)
+uint8_t SENSOR_getNewValue(LEVEL_HandleTypedef *const me)
 {
     if (me == NULL)
     {
         return CTL_ERROR;
     }
 
-    float level;
+    uint8_t level;
     level = (*me->levenGetLevel)(me);
 
     //level = (float)me->install + (SENSOR_cosine(me->angle) * (*me->levenGetLevel)(me));
