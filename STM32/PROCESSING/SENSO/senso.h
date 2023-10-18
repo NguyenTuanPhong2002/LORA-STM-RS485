@@ -2,7 +2,8 @@
  * senso.h
  *
  *  Created on: Aug 3, 2023
- *      Author: ACER
+ *      Author: NTPhong
+ *      gmail: ntphong011102@gmail.com
  */
 
 #ifndef SENSO_SENSO_H_
@@ -10,7 +11,7 @@
 
 #include "main.h"
 
-#include "../../CONTROLLER/handle.h"
+#include "../../PROCESSING/DEBUG/handle.h"
 
 #define LEVEL_BUFFER_SIZE 100
 

@@ -2,7 +2,8 @@
  * ewg.h
  *
  *  Created on: Aug 3, 2023
- *      Author: ACER
+ *      Author: NTPhong
+ *      gmail: ntphong011102@gmail.com
  */
 
 #ifndef EWG_EWG_H_

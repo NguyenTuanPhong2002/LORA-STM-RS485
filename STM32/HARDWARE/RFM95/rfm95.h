@@ -2,7 +2,8 @@
  * rfm95.h
  *
  *  Created on: Aug 9, 2023
- *      Author: ACER
+ *      Author: NTPhong
+ *      gmail: ntphong011102@gmail.com
  */
 
 #ifndef RFM95_RFM95_H_

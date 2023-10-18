@@ -1,3 +1,11 @@
+/*
+ * senso.h
+ *
+ *  Created on: Aug 3, 2023
+ *      Author: NTPhong
+ *      gmail: ntphong011102@gmail.com
+ */
+
 #include "senso.h"
 
 #include <stdio.h>

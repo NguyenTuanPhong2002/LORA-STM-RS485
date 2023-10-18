@@ -1,3 +1,10 @@
+/*
+ * ewg.h
+ *
+ *  Created on: Oct 9, 2023
+ *      Author: NTPhong
+ *      gmail: ntphong011102@gmail.com
+ */
 #include "ewg.h"
 
 #include <string.h>

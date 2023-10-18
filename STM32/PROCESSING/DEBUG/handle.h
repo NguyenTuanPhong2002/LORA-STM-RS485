@@ -2,15 +2,14 @@
  * controller.h
  *
  *  Created on: Aug 8, 2023
- *      Author: ACER
+ *      Author: NTPhong
+ *      gmail: ntphong011102@gmail.com
  */
 
 #ifndef INC_CONTROLLER_H_
 #define INC_CONTROLLER_H_
 
 #include "main.h"
-
-
 
 typedef enum
 {

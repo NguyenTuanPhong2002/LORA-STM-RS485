@@ -2,7 +2,8 @@
  * lora.c
  *
  *  Created on: Aug 9, 2023
- *      Author: ACER
+ *      Author: NTPhong
+ *      gmail: ntphong011102@gmail.com
  */
 
 

@@ -2,13 +2,14 @@
  * lora.h
  *
  *  Created on: Aug 9, 2023
- *      Author: ACER
+ *      Author: NTPhong
+ *      gmail: ntphong011102@gmail.com
  */
 
 #ifndef LORA_LORA_H_
 #define LORA_LORA_H_
 
-#include "../../CONTROLLER/handle.h"
+#include "../../PROCESSING/DEBUG/handle.h"
 
 typedef enum
 {
