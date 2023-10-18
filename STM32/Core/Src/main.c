@@ -1,27 +1,37 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2023 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2023 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stdio.h"
 
+#include "senso.h"
+#include "lora.h"
+
+#include "ewg.h"
+#include "rfm95.h"
+
+#include "handle.h"
+#include "config.h"
+#include "string.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,28 +52,180 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc;
 
+RTC_HandleTypeDef hrtc;
+
 SPI_HandleTypeDef hspi1;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+EWG_HandleTypedef ewg = { 0 };
+RFM95_HandleTypeDef rfm95w = { 0 };
+
+LEVEL_HandleTypedef *level;
+LORA_HandleTypeDef *lora;
+
+CFG_HandleTypeDef *device;
+
+uint8_t irqLoRaFlag = 0;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_ADC_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_RTC_Init(void);
+static void MX_ADC_Init(void);
 /* USER CODE BEGIN PFP */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	/* Wake up MCU from stop mode by any EXTI line */
+	if (GPIO_Pin == rfm95w.dio0) {
+		/* Set flag to read LoRa message */
+		irqLoRaFlag = 1;
+	}
+}
 
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
+	if (huart->Instance == USART2) {
+		SENSOR_process(level, Size);
+	}
+	if (huart->Instance == USART1) {
+		HAL_PWR_DisableSleepOnExit();
+	}
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void CFG_Init() {
+	CFG_HandleTypeDef cfg = { 0 };
+	device = &cfg;
+
+	//  CFG_getID(device);
+	//  CFG_getMaster(device);
+
+	CFG_setDeviceID(device, "0982586020", strlen("0982586020"));
+	CFG_setDeviceMaster(device, "0982586020", strlen("0982586020"));
+
+	CFG_writeEEPROM(device);
+}
+
+void EWG_begin() {
+	level = (LEVEL_HandleTypedef*) &ewg;
+
+	ewg.section = 4;
+	level->levenInit = (levenInit) &EWG_init;
+	level->levenDeInit = (levenDeInit) &EWG_deInit;
+	level->levenProcess = (levenProcess) &EWG_process;
+	level->levenGetConfig = (levenGetConfig) &EWG_getConfig;
+	level->levsenSetSection = (levsenSetSection) &EWG_setSection;
+	level->levenGetLevel = (levenGetLevel) &EWG_getLevel;
+
+	if (SENSOR_init(level) == CTL_OK) {
+		print("SENSOR OK");
+	} else {
+		print("SENSOR ERROR");
+	}
+
+	// SENSO_readEEPROM(&level);
+	// SENSO_writeEEPROM(&level);
+}
+
+void LORA_begin() {
+	lora = (LORA_HandleTypeDef*) &rfm95w;
+
+	rfm95w.resetPort = RESET_GPIO_Port;
+	rfm95w.resetPin = RESET_Pin;
+	rfm95w.nssPort = NSS_GPIO_Port;
+	rfm95w.nssPin = NSS_Pin;
+	rfm95w.dio0Port = DIO0_GPIO_Port;
+	rfm95w.dio0 = DIO0_Pin;
+	rfm95w.hspi = &hspi1;
+
+	rfm95w.parent.init = (loraInit) &RFM95_init;
+	rfm95w.parent.transmit = (loraTransmit) &RFM95_transmit;
+	rfm95w.parent.receive = (loraReceive) &RFM95_receiveContinuous;
+	rfm95w.parent.startReceiveIT =
+			(loraStartReceiveOnIRQ) &RFM95_startReceiveIT;
+	rfm95w.parent.receiveIT = (loraReceiveOnIRQ) &RFM95_receiveIT;
+	rfm95w.parent.shutdown = (loraShutdown) &RFM95_shutdown;
+	rfm95w.parent.getRSSI = (loraGetRSSI) &RFM95_getRSSI;
+
+	if (LORA_init(lora) == CTL_OK) {
+		print("LORA OK");
+	} else {
+		print("LORA ERROR");
+	}
+}
+
+uint8_t CTL_CRC8XOR(const uint8_t *array, size_t size) {
+	uint8_t value = 0;
+	for (size_t i = 0; i < size; i++) {
+		value ^= array[i];
+	}
+	return value;
+}
+
+void processValue() {
+	uint8_t senso;
+	uint8_t messLora[4] = { 0 };
+	senso = SENSOR_getNewValue(level);
+
+	char buff[100] = { 0 };
+	sprintf(buff, "VALUE = %u", senso);
+	print(buff);
+
+	char *id = CFG_getDeviceID(device);
+	char *master = CFG_getDeviceMaster(device);
+
+	messLora[0] = CTL_CRC8XOR((uint8_t*) id, strlen(id));
+	messLora[1] = CTL_CRC8XOR((uint8_t*) master, strlen(master));
+	messLora[2] = (uint8_t) senso;
+	messLora[3] = CTL_CRC8XOR(messLora, 3);
+	LORA_transmit(lora, messLora, 4, 1000);
+}
+
+void loraHandle() {
+	enum {
+		LORA_RESPONSE_SIZE = 4
+	};
+	uint8_t msgResLoRa[LORA_RESPONSE_SIZE] = { 0 };
+	uint8_t messLora[4] = { 0 };
+
+	char id[CFG_DEVICE_ID_SIZE] = { 0 };
+	char master[CFG_DEVICE_ID_SIZE] = { 0 };
+
+	for (size_t i = 0; i < CFG_DEVICE_ID_SIZE - 1; i++) {
+		id[i] = *(volatile uint8_t*) (CFG_EEPROM_DEVICE_ID + i);
+	}
+
+	for (size_t i = 0; i < CFG_MASTER_ID_SIZE - 1; i++) {
+		master[i] = *(volatile uint8_t*) (CFG_EEPROM_MASTER_ID + i);
+	}
+
+	messLora[0] = CTL_CRC8XOR((uint8_t*) id, strlen(id));
+	messLora[1] = CTL_CRC8XOR((uint8_t*) master, strlen(master));
+	messLora[2] = 0x01;
+	messLora[3] = CTL_CRC8XOR(messLora, 3);
+
+	LORA_startReceiveIT(lora);
+	uint16_t timeStap = HAL_GetTick();
+	while (HAL_GetTick() - timeStap < 60000) {
+		if (irqLoRaFlag) {
+			irqLoRaFlag = 0;
+			LORA_receiveIT(lora, msgResLoRa, LORA_RESPONSE_SIZE);
+			if (msgResLoRa[0] == messLora[0] && msgResLoRa[1] == messLora[1]
+					&& msgResLoRa[3] == messLora[3]) {
+				processValue();
+			}
+			break;
+		}
+	}
+}
 
 /* USER CODE END 0 */
 
@@ -95,22 +257,31 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_ADC_Init();
   MX_SPI1_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
+  MX_RTC_Init();
+  MX_ADC_Init();
   /* USER CODE BEGIN 2 */
+
+	print("EWG TO LORA");
+
+	LORA_begin();
+
+	EWG_begin();
+
+	CFG_Init();
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+	while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+		loraHandle();
+	}
   /* USER CODE END 3 */
 }
 
@@ -128,10 +299,16 @@ void SystemClock_Config(void)
   */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
+  /** Configure LSE Drive Capability
+  */
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
+
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = 0;
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_5;
@@ -154,9 +331,11 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_USART2;
-  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK2;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_USART2
+                              |RCC_PERIPHCLK_RTC;
+  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_SYSCLK;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
@@ -220,6 +399,89 @@ static void MX_ADC_Init(void)
 }
 
 /**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  RTC_TimeTypeDef sTime = {0};
+  RTC_DateTypeDef sDate = {0};
+  RTC_AlarmTypeDef sAlarm = {0};
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutRemap = RTC_OUTPUT_REMAP_NONE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /* USER CODE BEGIN Check_RTC_BKUP */
+
+  /* USER CODE END Check_RTC_BKUP */
+
+  /** Initialize RTC and set the Time and Date
+  */
+  sTime.Hours = 0x0;
+  sTime.Minutes = 0x0;
+  sTime.Seconds = 0x0;
+  sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+  sDate.Month = RTC_MONTH_JANUARY;
+  sDate.Date = 0x1;
+  sDate.Year = 0x0;
+
+  if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Enable the Alarm A
+  */
+  sAlarm.AlarmTime.Hours = 0x0;
+  sAlarm.AlarmTime.Minutes = 0x10;
+  sAlarm.AlarmTime.Seconds = 0x0;
+  sAlarm.AlarmTime.SubSeconds = 0x0;
+  sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+  sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  sAlarm.AlarmMask = RTC_ALARMMASK_NONE;
+  sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
+  sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;
+  sAlarm.AlarmDateWeekDay = 0x1;
+  sAlarm.Alarm = RTC_ALARM_A;
+  if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BCD) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
+
+}
+
+/**
   * @brief SPI1 Initialization Function
   * @param None
   * @retval None
@@ -241,7 +503,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_HARD_INPUT;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
   hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
@@ -273,7 +535,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
+  huart1.Init.BaudRate = 9600;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -308,7 +570,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 4800;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -344,16 +606,23 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, RESET_Pin|RE_Pin|DE_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, NSS_Pin|PWR_SENSO_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(PWR_SENSO_GPIO_Port, PWR_SENSO_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, RESET_Pin|RE_Pin|DE_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : DIO0_Pin */
   GPIO_InitStruct.Pin = DIO0_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(DIO0_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : NSS_Pin PWR_SENSO_Pin */
+  GPIO_InitStruct.Pin = NSS_Pin|PWR_SENSO_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : RESET_Pin RE_Pin DE_Pin */
   GPIO_InitStruct.Pin = RESET_Pin|RE_Pin|DE_Pin;
@@ -368,12 +637,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(DIO1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PWR_SENSO_Pin */
-  GPIO_InitStruct.Pin = PWR_SENSO_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(PWR_SENSO_GPIO_Port, &GPIO_InitStruct);
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -390,11 +656,10 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+	__disable_irq();
+	while (1) {
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 

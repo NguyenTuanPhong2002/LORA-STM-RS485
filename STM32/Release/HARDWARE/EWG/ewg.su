@@ -1,0 +1,9 @@
+../HARDWARE/EWG/ewg.c:61:10:EWG_calcCRC16Modbus	20	static
+../HARDWARE/EWG/ewg.c:87:26:sendCommand.constprop	32	static
+../HARDWARE/EWG/ewg.c:142:19:EWG_init	24	static
+../HARDWARE/EWG/ewg.c:179:19:EWG_deInit	8	static
+../HARDWARE/EWG/ewg.c:194:19:EWG_process	16	static
+../HARDWARE/EWG/ewg.c:208:7:EWG_getLevel	24	static
+../HARDWARE/EWG/ewg.c:244:19:EWG_setSection	0	static
+../HARDWARE/EWG/ewg.c:263:19:EWG_getConfig	16	static
+../HARDWARE/EWG/ewg.c:278:19:EWG_writeEEPROMs	0	static
