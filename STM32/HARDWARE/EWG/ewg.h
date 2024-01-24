@@ -25,7 +25,8 @@
 
 /* Address to save section in EEPROM */
 #define EWG_EEPROM_SECTION (SENSOR_EEPROM_ANGLE + 1)
-typedef struct {
+typedef struct
+{
 	LEVEL_HandleTypedef leverHandle;
 	uint8_t section;
 	uint8_t sectionLevel[EWG_MAX_SECTION];
@@ -35,10 +36,10 @@ typedef struct {
 CTL_StatusTypedef EWG_init(EWG_HandleTypedef *const me);
 CTL_StatusTypedef EWG_deInit(EWG_HandleTypedef *const me);
 CTL_StatusTypedef EWG_process(EWG_HandleTypedef *const me, uint16_t size);
-uint8_t EWG_getLevel(EWG_HandleTypedef *const me);
+float EWG_getLevel(EWG_HandleTypedef *const me);
 CTL_StatusTypedef EWG_setSection(EWG_HandleTypedef *const me, uint8_t section);
 CTL_StatusTypedef EWG_getConfig(EWG_HandleTypedef *const me,
-		uint32_t configType, char pData[], uint16_t size);
+								uint32_t configType, char pData[], uint16_t size);
 CTL_StatusTypedef EWG_writeEEPROMs(EWG_HandleTypedef *const me);
 
 #endif /* EWG_EWG_H_ */
