@@ -1030,6 +1030,7 @@ HAL_StatusTypeDef HAL_RCC_ClockConfig(RCC_ClkInitTypeDef  *RCC_ClkInitStruct, ui
   }
 
   return HAL_OK;
+
 }
 
 /**
