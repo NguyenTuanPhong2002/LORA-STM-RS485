@@ -82,14 +82,14 @@ CTL_StatusTypedef SENSOR_setSection(LEVEL_HandleTypedef *const me, uint8_t secti
     return (*me->levsenSetSection)(me, section);
 }
 
-uint8_t SENSOR_getNewValue(LEVEL_HandleTypedef *const me)
+float SENSOR_getNewValue(LEVEL_HandleTypedef *const me)
 {
     if (me == NULL)
     {
         return CTL_ERROR;
     }
 
-    uint8_t level;
+    float level;
     level = (*me->levenGetLevel)(me);
 
     //level = (float)me->install + (SENSOR_cosine(me->angle) * (*me->levenGetLevel)(me));
