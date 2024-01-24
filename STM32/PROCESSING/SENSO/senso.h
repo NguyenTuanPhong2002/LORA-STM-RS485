@@ -21,7 +21,7 @@ typedef struct level
     volatile uint32_t SR;
     uint16_t sizeResponse;
 
-    uint8_t levelValue;
+    float levelValue;
     uint8_t angle;
     uint8_t valueIndex;
     uint32_t install;
@@ -32,7 +32,7 @@ typedef struct level
     CTL_StatusTypedef (*levenGetConfig)(struct level *const me, uint32_t configType, char pData[], uint16_t size);
     CTL_StatusTypedef (*levsenSetSection)(struct level *const me, uint8_t section);
 
-    uint8_t (*levenGetLevel)(struct level *const me);
+    float (*levenGetLevel)(struct level *const me);
 
 } LEVEL_HandleTypedef;
 
@@ -69,7 +69,7 @@ CTL_StatusTypedef SENSOR_deInit(LEVEL_HandleTypedef *const me);
 CTL_StatusTypedef SENSOR_process(LEVEL_HandleTypedef *const me, uint16_t size);
 CTL_StatusTypedef SENSOR_getConfig(LEVEL_HandleTypedef *const me, uint32_t configType, char pData[], uint16_t size);
 CTL_StatusTypedef SENSOR_setSection(LEVEL_HandleTypedef *const me, uint8_t section);
-uint8_t SENSOR_getNewValue(LEVEL_HandleTypedef *const me);
+float SENSOR_getNewValue(LEVEL_HandleTypedef *const me);
 
 CTL_StatusTypedef SENSOR_setAngle(LEVEL_HandleTypedef *const me, uint8_t value);
 CTL_StatusTypedef SENSO_setInstall(LEVEL_HandleTypedef *const me, uint8_t value);
