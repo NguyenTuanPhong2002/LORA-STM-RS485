@@ -147,7 +147,7 @@ static CTL_StatusTypedef sendCommand(EWG_HandleTypedef *const me, uint8_t *Comma
     return status;
 }
 
-CTL_StatusTypedef EWG_init(EWG_HandleTypedef *const me)
+CTL_StatusTypedef   EWG_init(EWG_HandleTypedef *const me)
 {
     if (me == NULL)
     {
@@ -215,11 +215,11 @@ CTL_StatusTypedef EWG_process(EWG_HandleTypedef *const me, uint16_t size)
     return CTL_OK;
 }
 
-uint8_t EWG_getLevel(EWG_HandleTypedef *const me)
+float EWG_getLevel(EWG_HandleTypedef *const me)
 {
-    uint8_t lever = 0u;
+    float level = 0.0f;
 
-    uint8_t queryFrame[8] = {0x00, 0x03, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00};
+    uint8_t queryFrame[8] = {0x0, 0x3, 0x0, 0x0, 0x0, 0x7, 0x0, 0x0};
 
     EWG_powerEnable(me);
 
@@ -232,23 +232,23 @@ uint8_t EWG_getLevel(EWG_HandleTypedef *const me)
 
         if (CTL_OK == sendCommand(me, queryFrame, sizeof(queryFrame), 1000))
         {
-            lever += me->sectionLevel[i];
+            level += me->sectionLevel[i];
         }
     }
 
     EWG_powerDisable(me);
 
-    if (lever >= (me->section * LENGTH_OF_ONE_SECTION))
+    if (level >= (me->section * LENGTH_OF_ONE_SECTION))
     {
-        lever = 0u;
+        level = 0.0f;
     }
     else
     {
         /* Convert cm to mm */
-        lever *= 10u;
+        level *= 10.0f;
     }
 
-    return lever;
+    return level;
 }
 
 CTL_StatusTypedef EWG_setSection(EWG_HandleTypedef *const me, uint8_t section)
