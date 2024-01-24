@@ -25,9 +25,11 @@
 
 #include "senso.h"
 #include "lora.h"
+#include "power.h"
 
 #include "ewg.h"
 #include "rfm95.h"
+#include "battery.h"
 
 #include "handle.h"
 #include "config.h"
@@ -56,7 +58,6 @@ RTC_HandleTypeDef hrtc;
 
 SPI_HandleTypeDef hspi1;
 
-UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -65,7 +66,7 @@ RFM95_HandleTypeDef rfm95w = { 0 };
 
 LEVEL_HandleTypedef *level;
 LORA_HandleTypeDef *lora;
-
+POWER_HandleTypeDef *powerPtr;
 CFG_HandleTypeDef *device;
 
 uint8_t irqLoRaFlag = 0;
@@ -76,10 +77,9 @@ uint8_t irqLoRaFlag = 0;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_RTC_Init(void);
 static void MX_ADC_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	/* Wake up MCU from stop mode by any EXTI line */
@@ -149,8 +149,7 @@ void LORA_begin() {
 	rfm95w.parent.init = (loraInit) &RFM95_init;
 	rfm95w.parent.transmit = (loraTransmit) &RFM95_transmit;
 	rfm95w.parent.receive = (loraReceive) &RFM95_receiveContinuous;
-	rfm95w.parent.startReceiveIT =
-			(loraStartReceiveOnIRQ) &RFM95_startReceiveIT;
+	rfm95w.parent.startReceiveIT = (loraStartReceiveOnIRQ) &RFM95_startReceiveIT;
 	rfm95w.parent.receiveIT = (loraReceiveOnIRQ) &RFM95_receiveIT;
 	rfm95w.parent.shutdown = (loraShutdown) &RFM95_shutdown;
 	rfm95w.parent.getRSSI = (loraGetRSSI) &RFM95_getRSSI;
@@ -171,12 +170,12 @@ uint8_t CTL_CRC8XOR(const uint8_t *array, size_t size) {
 }
 
 void processValue() {
-	uint8_t senso;
-	uint8_t messLora[4] = { 0 };
+	float senso;
+	uint8_t messLora[6] = { 0 };
 	senso = SENSOR_getNewValue(level);
 
 	char buff[100] = { 0 };
-	sprintf(buff, "VALUE = %u", senso);
+	sprintf(buff, "VALUE = %f", senso);
 	print(buff);
 
 	char *id = CFG_getDeviceID(device);
@@ -185,8 +184,11 @@ void processValue() {
 	messLora[0] = CTL_CRC8XOR((uint8_t*) id, strlen(id));
 	messLora[1] = CTL_CRC8XOR((uint8_t*) master, strlen(master));
 	messLora[2] = (uint8_t) senso;
-	messLora[3] = CTL_CRC8XOR(messLora, 3);
-	LORA_transmit(lora, messLora, 4, 1000);
+	messLora[3] = POWER_getBatVoltage(powerPtr);
+	messLora[4] = POWER_getBatPercent(powerPtr);
+	messLora[5] = CTL_CRC8XOR(messLora, 5);
+	LORA_transmit(lora, messLora, 6, 1000);
+	NVIC_SystemReset();
 }
 
 void loraHandle() {
@@ -227,6 +229,31 @@ void loraHandle() {
 	}
 }
 
+void POWER_Init(void) {
+	printf("%s\n", __FUNCTION__);
+	/* Khởi tạo biến tĩnh để các giá trị khởi tạo không bị mất đi */
+	static BATTERY_HandleTypeDef battery = { 0 };
+
+	/* Khởi tạo giá trị cho con tr�?, biến con tr�? là biến toàn cục */
+	powerPtr = (POWER_HandleTypeDef*) &battery;
+
+	/* Khởi tạo giá trị của các member của struct */
+	battery.hadc = &hadc;
+	battery.parent.getPercent = (powerGetPercent) &BATTERY_getBatteryPercent;
+	battery.parent.getPowerState = (powerGetPowerState) &BATTERY_getPowerState;
+	battery.parent.getVoltage = (powerGetVoltage) &BATTERY_getBatteryVoltage;
+	battery.parent.init = (powerInit) &BATTERY_init;
+
+	/* Khởi tạo nguồn */
+	if (CTL_ERROR == POWER_init(powerPtr)) {
+		printf("Power init fail!\n");
+	} else {
+		/* Bật c�? cho phép cảnh báo pin yếu ngay khi khởi động thiết bị */
+		POWER_SET_FLAG(powerPtr, POWER_FLAG_WARNEN);
+		POWER_getBatPercent(powerPtr);
+		// printf("Power Voltage: %.2fV\n", POWER_getBatVoltage(powerPtr));
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -258,19 +285,17 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI1_Init();
-  MX_USART1_UART_Init();
   MX_USART2_UART_Init();
-  MX_RTC_Init();
   MX_ADC_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
 	print("EWG TO LORA");
-
-	LORA_begin();
-
-	EWG_begin();
-
 	CFG_Init();
+	POWER_Init();
+	LORA_begin();
+	EWG_begin();
+	processValue();
 
   /* USER CODE END 2 */
 
@@ -280,7 +305,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		loraHandle();
+		//loraHandle();
 	}
   /* USER CODE END 3 */
 }
@@ -307,12 +332,14 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-  RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-  RCC_OscInitStruct.MSICalibrationValue = 0;
-  RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_5;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.HSIState = RCC_HSI_DIV4;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLLMUL_4;
+  RCC_OscInitStruct.PLL.PLLDIV = RCC_PLLDIV_2;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -322,8 +349,8 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_MSI;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV8;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
@@ -331,9 +358,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_USART2
-                              |RCC_PERIPHCLK_RTC;
-  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_SYSCLK;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_RTC;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
   PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
@@ -364,9 +389,9 @@ static void MX_ADC_Init(void)
   */
   hadc.Instance = ADC1;
   hadc.Init.OversamplingMode = DISABLE;
-  hadc.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV1;
+  hadc.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
   hadc.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc.Init.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  hadc.Init.SamplingTime = ADC_SAMPLETIME_3CYCLES_5;
   hadc.Init.ScanConvMode = ADC_SCAN_DIRECTION_FORWARD;
   hadc.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc.Init.ContinuousConvMode = DISABLE;
@@ -377,7 +402,7 @@ static void MX_ADC_Init(void)
   hadc.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc.Init.Overrun = ADC_OVR_DATA_PRESERVED;
   hadc.Init.LowPowerAutoWait = DISABLE;
-  hadc.Init.LowPowerFrequencyMode = ENABLE;
+  hadc.Init.LowPowerFrequencyMode = DISABLE;
   hadc.Init.LowPowerAutoPowerOff = DISABLE;
   if (HAL_ADC_Init(&hadc) != HAL_OK)
   {
@@ -461,7 +486,7 @@ static void MX_RTC_Init(void)
   /** Enable the Alarm A
   */
   sAlarm.AlarmTime.Hours = 0x0;
-  sAlarm.AlarmTime.Minutes = 0x10;
+  sAlarm.AlarmTime.Minutes = 0x0;
   sAlarm.AlarmTime.Seconds = 0x0;
   sAlarm.AlarmTime.SubSeconds = 0x0;
   sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
@@ -516,41 +541,6 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-
-  /* USER CODE END USART1_Init 2 */
 
 }
 
@@ -638,7 +628,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(DIO1_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_1_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI0_1_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
